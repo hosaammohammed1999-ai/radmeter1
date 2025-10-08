@@ -5,6 +5,8 @@ import numpy as np
 from datetime import datetime, timedelta
 import sqlite3
 import os
+
+DB_PATH = os.getenv('DB_PATH', 'attendance.db')
 import base64
 import pandas as pd
 import threading
@@ -52,7 +54,7 @@ radiation_cache = get_radiation_cache()
 def update_cache_from_local_db():
     """تحديث التخزين المؤقت من قاعدة البيانات المحلية"""
     try:
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         # جلب آخر 10 قراءات من قاعدة البيانات المحلية
@@ -144,7 +146,7 @@ if not os.path.exists('static/employees'):
 
 # إنشاء قاعدة البيانات
 def init_db():
-    conn = sqlite3.connect('attendance.db')
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     # تفعيل إعدادات SQLite لتحسين الاعتمادية والأداء
@@ -368,7 +370,7 @@ def save_reading_to_database(reading):
     """حفظ قراءة واحدة في قاعدة البيانات المحلية - محدث لربط القراءات بالجلسات"""
     try:
         # حفظ في SQLite المحلية
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         # إنشاء جدول قراءات الإشعاع إذا لم يكن موجوداً
@@ -599,7 +601,7 @@ def get_radiation_data():
 
         # جلب البيانات من SQLite المحلية
         try:
-            conn = sqlite3.connect('attendance.db')
+            conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
 
             # إنشاء الجدول إذا لم يكن موجوداً
@@ -680,7 +682,7 @@ def get_system_status():
         db_status = "unknown"
         try:
             # فحص اتصال SQLite
-            conn = sqlite3.connect('attendance.db')
+            conn = sqlite3.connect(DB_PATH)
             conn.close()
             db_status = "connected"
         except Exception:
@@ -986,7 +988,7 @@ def get_current_total_dose():
                 return latest_reading.total_absorbed_dose
 
         # ثانياً: الحصول من قاعدة البيانات كبديل
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''SELECT total_absorbed_dose FROM radiation_readings_local
                      ORDER BY timestamp DESC LIMIT 1''')
@@ -1016,7 +1018,7 @@ def get_average_dose_rate_from_cache():
                 return avg_rate
 
         # بديل: الحصول من قاعدة البيانات
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''SELECT AVG(absorbed_dose_rate) FROM radiation_readings_local
                      WHERE timestamp > datetime('now', '-1 hour')''')
@@ -1036,7 +1038,7 @@ def get_average_dose_rate_from_cache():
 def calculate_employee_exposure(employee_id, start_time, end_time, session_id=None):
     """حساب التعرض الفعلي للموظف خلال فترة العمل بدقة عالية - محدث"""
     try:
-            conn = sqlite3.connect('attendance.db')
+            conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
 
             # تطبيع الأوقات باستخدام النظام المحسن
@@ -1139,7 +1141,7 @@ def get_dose_rate_stats(start_time, end_time):
 def get_employee_daily_dose(employee_id, date=None):
     """حساب الجرعة اليومية للموظف في تاريخ محدد"""
     try:
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         if date is None:
@@ -1167,7 +1169,7 @@ def get_employee_daily_dose(employee_id, date=None):
 def get_employee_cumulative_dose(employee_id):
     """حساب الجرعة التراكمية الإجمالية للموظف منذ بداية العمل"""
     try:
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         # جلب مجموع جميع الجرعات اليومية
@@ -1192,7 +1194,7 @@ def get_employee_cumulative_dose(employee_id):
 def check_dose_limits(employee_id, daily_dose, cumulative_dose):
     """التحقق من تجاوز الحدود اليومية والسنوية"""
     try:
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         # جلب معلومات الموظف (للتحقق من حالة الحمل)
@@ -1301,7 +1303,7 @@ def get_employee_dose_summary(employee_id):
 def get_employee_exposure_history(employee_id):
     """الحصول على تاريخ التعرض للموظف مع الجرعات اليومية"""
     try:
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         # الحصول على آخر 30 فترة تعرض مع الحقول الجديدة
@@ -1444,7 +1446,7 @@ def get_latest_radiation():
     """الحصول على أحدث قراءة إشعاع من قاعدة البيانات المحلية"""
     try:
         # قراءة من SQLite المحلية
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''SELECT cpm, source_power, absorbed_dose_rate, total_absorbed_dose, timestamp
                      FROM radiation_readings_local
@@ -1487,7 +1489,7 @@ def get_latest_radiation():
 def get_tube_settings():
     """جلب نوع أنبوب Geiger الحالي من system_settings"""
     try:
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         # ضمان وجود قيمة افتراضية
         c.execute('''INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description)
@@ -1509,7 +1511,7 @@ def set_tube_type():
         tube_type = data.get('tube_type')
         if tube_type not in ['SBM20', 'J305']:
             return jsonify({'success': False, 'error': 'نوع أنبوب غير صحيح. استخدم SBM20 أو J305'}), 400
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute('''INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description)
                      VALUES ('tube_type', 'J305', 'نوع أنبوب Geiger المستخدم (SBM20 أو J305)')''')
@@ -1610,7 +1612,7 @@ def add_radiation_employee():
 def get_radiation_employee(employee_id):
     """جلب معلومات موظف من نظام مراقبة الإشعاع - موحّد على attendance.db"""
     try:
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         # ضمان أعمدة حدود الجرعات موجودة
@@ -1663,7 +1665,7 @@ def start_radiation_exposure_session():
             return jsonify({'success': False, 'error': 'رقم الموظف مطلوب'}), 400
         
         # التحقق من وجود الموظف
-        conn = sqlite3.connect('attendance.db')
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         
         c.execute('SELECT employee_id, name FROM employees WHERE employee_id = ?', (employee_id,))
