@@ -51,4 +51,5 @@ ENV PORT=8080
 EXPOSE 8080
 
 # Single worker because the app uses background threads/scheduler
-CMD ["gunicorn", "--workers", "1", "--timeout", "120", "-b", "0.0.0.0:8080", "app:app"]
+# Bind to $PORT if provided by the platform, default to 8080 for local runs
+CMD ["sh", "-c", "gunicorn --workers 1 --timeout 120 -b 0.0.0.0:${PORT:-8080} app:app"]
