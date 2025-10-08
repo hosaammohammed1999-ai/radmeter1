@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DoseMeter - Reports</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <style>
+        /* توحيد التصميم مع النظام العام */
+        .unified-body {
+            background: var(--gradient-bg);
+            min-height: 100vh;
+            font-family: 'Cairo', sans-serif;
+            position: relative;
+        }
+
+        .unified-body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 80%, rgba(30, 64, 175, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .unified-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .unified-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--gradient-primary);
+        }
+
+        .stats-card {
+            background: var(--gradient-primary);
+            color: var(--text-white);
+            border-radius: 16px;
+            transition: all 0.4s ease;
+            border: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stats-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .stats-card:hover::before {
+            left: 100%;
+        }
+
+        .nav-tabs {
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+
+        .nav-tabs .nav-link {
+            border-radius: 12px 12px 0 0;
+            margin-left: 8px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-tabs .nav-link::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-primary);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .nav-tabs .nav-link.active {
+            background: var(--gradient-primary);
+            color: var(--text-white);
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow);
+        }
+
+        .nav-tabs .nav-link.active::before {
+            transform: scaleX(1);
+        }
+
+        .nav-tabs .nav-link:hover:not(.active) {
+            background: var(--glass-bg);
+            color: var(--primary-color);
+            transform: translateY(-2px);
+        }
+
+        .table-responsive {
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        
+        .badge-status {
+            font-size: 0.8rem;
+            padding: 0.5rem 1rem;
+        }
+        
+        .filter-section {
+            background: var(--glass-bg);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+        }
+
+        .table {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .table thead th {
+            background: var(--gradient-primary);
+            color: var(--text-white);
+            border: none;
+            font-weight: 600;
+            padding: 1rem;
+        }
+
+        .table tbody tr {
+            transition: all 0.3s ease;
+        }
+
+        .table tbody tr:hover {
+            background: var(--light-bg);
+            transform: scale(1.01);
+        }
+
+        .badge {
+            border-radius: 8px;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+        }
+
+        .progress {
+            height: 8px;
+            border-radius: 10px;
+            background: var(--light-bg);
+        }
+
+        .progress-bar {
+            border-radius: 10px;
+            transition: width 0.6s ease;
+        }
+    </style>
+</head>
+<body class="unified-body">
+    <!-- شريط التنقل الموحد -->
+    <nav class="navbar navbar-expand-lg modern-navbar">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-radiation-alt me-2"></i>
+<span class="brand-text">DoseMeter</span>
+            </a>
+            <div class="navbar-nav ms-auto d-flex align-items-center">
+<a class="nav-link modern-nav-link" href="/">
+                    <i class="fas fa-home me-1"></i>
+                    Home
+                </a>
+<a class="nav-link modern-nav-link" href="/attendance">
+                    <i class="fas fa-user-clock me-1"></i>
+                    Attendance
+                </a>
+                {% include 'navbar_alerts.html' %}
+                <div class="navbar-text ms-3 d-flex align-items-center">
+                    <i class="fas fa-clock me-1"></i>
+                    <span id="current-time" class="time-display"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+            <div class="container mt-4">
+                <style>
+                    /* Prevent uppercasing of unit text to preserve µ sign */
+                    .unit-text { text-transform: none !important; letter-spacing: normal; }
+                </style>
+        <!-- العنوان الرئيسي المحسن -->
+        <div class="text-center mb-5">
+<h1 class="display-4 mb-3" style="color: var(--primary-color); font-weight: 700;">
+                <i class="fas fa-chart-bar me-3"></i>
+                Unified Reports
+                <i class="fas fa-users ms-3"></i>
+            </h1>
+            <p class="lead" style="color: var(--text-secondary); font-weight: 500;">
+                <i class="fas fa-analytics me-2"></i>
+                Comprehensive view of attendance and radiation exposure data
+            </p>
+        </div>
+
+        <!-- قسم الفلاتر -->
+        <div class="unified-card filter-section">
+            <div class="row g-3">
+                <div class="col-md-3">
+<label class="form-label fw-bold">
+                        <i class="fas fa-user me-1"></i>
+                        Employee
+                    </label>
+                    <select class="form-select" id="employeeFilter">
+                        <option value="">All employees</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+<label class="form-label fw-bold">
+                        <i class="fas fa-calendar me-1"></i>
+                        From date
+                    </label>
+                    <input type="date" class="form-control" id="dateFromFilter">
+                </div>
+                <div class="col-md-3">
+<label class="form-label fw-bold">
+                        <i class="fas fa-calendar me-1"></i>
+                        To date
+                    </label>
+                    <input type="date" class="form-control" id="dateToFilter">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+<button class="btn btn-primary w-100" onclick="applyFilters()">
+                        <i class="fas fa-search me-2"></i>
+                        Search
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- إحصائيات سريعة -->
+        <div class="row mb-4" id="statsSection">
+            <div class="col-md-3 mb-3">
+                <div class="stats-card p-3 text-center">
+                    <i class="fas fa-users fa-2x mb-2"></i>
+                    <h5>Total records</h5>
+                    <h3 id="totalRecords">0</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="stats-card p-3 text-center">
+                    <i class="fas fa-sign-in-alt fa-2x mb-2"></i>
+                    <h5>Check-in records</h5>
+                    <h3 id="checkInRecords">0</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="stats-card p-3 text-center">
+                    <i class="fas fa-sign-out-alt fa-2x mb-2"></i>
+                    <h5>Check-out records</h5>
+                    <h3 id="checkOutRecords">0</h3>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="stats-card p-3 text-center">
+                    <i class="fas fa-user-check fa-2x mb-2"></i>
+                    <h5>Active employees</h5>
+                    <h3 id="activeEmployees">0</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- التبويبات الرئيسية -->
+        <div class="unified-card p-4">
+            <ul class="nav nav-tabs mb-4" id="reportTabs">
+                <li class="nav-item">
+<a class="nav-link active" id="attendance-tab" data-bs-toggle="tab" href="#attendance-content">
+                        <i class="fas fa-clock me-2"></i>
+                        Attendance
+                    </a>
+                </li>
+                <li class="nav-item">
+<a class="nav-link" id="cumulative-tab" data-bs-toggle="tab" href="#cumulative-content">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Cumulative Doses
+                    </a>
+                </li>
+                <li class="nav-item">
+<a class="nav-link" id="alerts-tab" data-bs-toggle="tab" href="#alerts-content">
+                        <i class="fas fa-bell me-2"></i>
+                        Alerts
+                        <span class="badge bg-danger ms-1" id="alertsTabBadge" style="display: none;">0</span>
+                    </a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- تبويب الحضور والانصراف -->
+                <div class="tab-pane fade show active" id="attendance-content">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+<thead class="table-dark">
+                                <tr>
+                                    <th><i class="fas fa-user me-1"></i> Employee</th>
+                                    <th><i class="fas fa-id-card me-1"></i> ID</th>
+                                    <th><i class="fas fa-briefcase me-1"></i> Position</th>
+                                    <th><i class="fas fa-clock me-1"></i> Type</th>
+                                    <th><i class="fas fa-calendar me-1"></i> Date</th>
+                                    <th><i class="fas fa-time me-1"></i> Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>
+                                        Loading data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+
+                <!-- تبويب الجرعات التراكمية -->
+                <div class="tab-pane fade" id="cumulative-content">
+                    <!-- معلومات إرشادية -->
+                    <div class="alert alert-info mb-4">
+                        <h6><i class="fas fa-info-circle me-2"></i>About cumulative doses</h6>
+                        <p class="mb-0">
+                            This section shows cumulative doses for all employees across different periods:
+                            <strong>Daily, Weekly, Monthly, Annual, and Total exposure</strong>
+                        </p>
+                    </div>
+
+                    <!-- جدول الجرعات التراكمية -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+<thead class="table-dark">
+                                <tr>
+                                    <th><i class="fas fa-user me-1"></i> Employee</th>
+                                    <th><i class="fas fa-calendar-day me-1"></i> DAILY <span class="unit-text">(µSv)</span></th>
+                                    <th><i class="fas fa-calendar-week me-1"></i> WEEKLY <span class="unit-text">(µSv)</span></th>
+                                    <th><i class="fas fa-calendar me-1"></i> MONTHLY <span class="unit-text">(µSv)</span></th>
+                                    <th><i class="fas fa-calendar-alt me-1"></i> ANNUAL <span class="unit-text">(µSv)</span></th>
+                                    <th><i class="fas fa-chart-line me-1"></i> TOTAL <span class="unit-text">(µSv)</span></th>
+                                    <th><i class="fas fa-clock me-1"></i> TOTAL DURATION</th>
+                                    <th><i class="fas fa-tachometer-alt me-1"></i> DOSE RATE</th>
+                                    <th><i class="fas fa-shield-alt me-1"></i> STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cumulativeTableBody">
+                                <tr>
+<td colspan="9" class="text-center py-4">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>
+                                        Loading cumulative dose data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- تبويب التنبيهات -->
+                <div class="tab-pane fade" id="alerts-content">
+                    <!-- أدوات التحكم -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-outline-primary active" onclick="filterAlerts('all')">
+                                    <i class="fas fa-list me-1"></i> All alerts
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" onclick="filterAlerts('unread')">
+                                    <i class="fas fa-bell me-1"></i> Unread
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <button class="btn btn-success" onclick="markAllAlertsRead()">
+                                <i class="fas fa-check-double me-1"></i>
+                                Mark all as read
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- معلومات إرشادية -->
+                    <div class="alert alert-info mb-4">
+                        <h6><i class="fas fa-shield-alt me-2"></i>Safety limits for radiation workers</h6>
+                        <p class="mb-2"><strong>Alerts are generated automatically according to the following limits:</strong></p>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6 class="text-primary"><i class="fas fa-clock me-1"></i>Hourly limits:</h6>
+                                <ul class="mb-0">
+                                    <li>✅ Safe: ≤ 0.3 μSv/h</li>
+                                    <li>⚠️ Warning: > 2.38 μSv/h</li>
+                                    <li>🚨 Danger: ≥ 2.38 μSv/h</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-success"><i class="fas fa-calendar-day me-1"></i>Daily limits:</h6>
+                                <ul class="mb-0">
+                                    <li>Daily limit: 54.8 μSv/day</li>
+                                    <li>⚠️ Warning at: 43.8 μSv (80%)</li>
+                                    <li>📊 Monitor at: 27.4 μSv (50%)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-danger"><i class="fas fa-calendar-alt me-1"></i>Annual/weekly:</h6>
+                                <ul class="mb-0">
+                                    <li>Annual limit: 20 mSv/year</li>
+                                    <li>Weekly limit: 383.6 μSv/week</li>
+                                    <li>Natural background: ~0.3 μSv/h</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="mt-3 p-2 bg-light rounded">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                <strong>Note:</strong> This system is designed for trained radiation workers in line with ICRP‑103 and IAEA guidelines.
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- جدول التنبيهات -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th style="width: 5%"><i class="fas fa-circle me-1"></i></th>
+                                    <th style="width: 20%"><i class="fas fa-user me-1"></i> Employee</th>
+                                    <th style="width: 10%"><i class="fas fa-exclamation-triangle me-1"></i> Level</th>
+                                    <th style="width: 35%"><i class="fas fa-comment me-1"></i> Message</th>
+                                    <th style="width: 15%"><i class="fas fa-chart-bar me-1"></i> Value</th>
+                                    <th style="width: 15%"><i class="fas fa-clock me-1"></i> Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alertsTableBody">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">
+                                        <i class="fas fa-spinner fa-spin me-2"></i>
+                                        Loading alerts...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/unified_reports.js') }}?v=20251006"></script>
+
+    <!-- سكريبت الساعة -->
+    <script>
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('current-time').textContent = timeString;
+        }
+
+        // تحديث الوقت كل ثانية
+        setInterval(updateTime, 1000);
+        updateTime(); // تشغيل فوري
+    </script>
+</body>
+</html>

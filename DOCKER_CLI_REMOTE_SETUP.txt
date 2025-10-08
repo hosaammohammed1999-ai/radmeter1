@@ -1,0 +1,199 @@
+إعداد Docker CLI على Windows للاتصال بمحرك Docker بعيد (بدون Docker Desktop)
+===========================================================
+
+نظرة عامة
+---------
+هذا الدليل يشرح كيفية:
+- تثبيت Docker CLI فقط على Windows (بدون Docker Desktop أو محرك محلي).
+- تهيئة الاتصال بمحرك Docker بعيد عبر TCP بشكل آمن باستخدام TLS.
+- اختبار الاتصال وتشغيل أوامر مثل docker ps و docker build على المحرك البعيد.
+
+المتطلبات المسبقة
+------------------
+- محرك Docker (Docker Engine) يعمل على خادم بعيد (Linux غالبًا).
+- صلاحية إدارية على الخادم البعيد لضبط TLS والجدار الناري.
+- على Windows: PowerShell (pwsh) ووسيلة لتحميل الملفات (Invoke-WebRequest) ونقل الشهادات (scp/WinSCP/PSCP أو أي طريقة مناسبة).
+
+تحذير أمني مهم
+----------------
+لا تقم أبدًا بفتح Docker على شبكة بدون TLS. المنفذ 2375 (بدون TLS) خطر جدًا ويتيح تحكمًا كاملاً بأي شخص يصل إليه. استخدم المنفذ 2376 مع TLS فقط، وقيّد الوصول عبر الجدار الناري.
+
+القسم 1) تثبيت Docker CLI فقط على Windows
+-----------------------------------------
+الطريقة الموصى بها: تنزيل «النسخة الثابتة الرسمية» للـ CLI (docker.exe) ووضعها في مجلد مستخدمك وإضافته إلى PATH (لا يتطلب صلاحيات مدير).
+
+خطوات PowerShell (نفّذها في نافذة PowerShell للمستخدم الحالي):
+
+1) تحديد الإصدار وتنزيل ملف zip:
+   $DOCKER_VERSION = "27.2.0"   # يمكنك تغييره إلى الإصدار المطلوب
+   $zipUrl   = "https://download.docker.com/win/static/stable/x86_64/docker-$DOCKER_VERSION.zip"
+   $zipPath  = "$env:TEMP/docker-$DOCKER_VERSION.zip"
+   $extract  = "$env:TEMP/docker-$DOCKER_VERSION"
+   $install  = "$HOME/bin/docker-cli"
+
+   Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+   Expand-Archive -Path $zipPath -DestinationPath $extract -Force
+
+2) إنشاء مجلد التثبيت ونقل docker.exe إليه:
+   New-Item -ItemType Directory -Path $install -Force | Out-Null
+   Copy-Item "$extract/docker/docker.exe" "$install/docker.exe" -Force
+
+3) إضافة المجلد إلى PATH (على مستوى المستخدم):
+   $old = [Environment]::GetEnvironmentVariable("Path","User")
+   if ($old -notlike "*$install*") {
+     [Environment]::SetEnvironmentVariable("Path", ($old + ";" + $install), "User")
+   }
+
+4) أعد فتح نافذة PowerShell ثم تحقّق:
+   docker --version
+
+ملاحظات:
+- إذا رغبت بالتثبيت على مستوى الجهاز (Machine) أو ضمن "C:\Program Files" ستحتاج إلى نافذة PowerShell بامتيازات المدير.
+- لا تحتاج Docker Desktop لهذه الطريقة؛ هذا فقط العميل (CLI) وسيتصل بمحرك بعيد.
+
+القسم 2) إعداد المحرك البعيد (Linux) لاستخدام TLS (منفذ 2376)
+-------------------------------------------------------------
+نفّذ هذه الخطوات على الخادم البعيد بصلاحيات root أو عبر sudo.
+
+1) تحضير مجلد الشهادات:
+   sudo mkdir -p /etc/docker/certs
+   cd /etc/docker/certs
+
+2) إنشاء سلطة إصدار (CA) وشهادة الخادم وشهادة عميل:
+   # إنشاء CA (سيُطلب منك Passphrase؛ يمكنك تركه فارغًا إن رغبت)
+   openssl genrsa -aes256 -out ca-key.pem 4096
+   openssl req -new -x509 -days 3650 -key ca-key.pem -sha256 -subj "/CN=docker-ca" -out ca.pem
+
+   # مفاتيح وشهادة الخادم (عدّل الأسماء بما يناسب خادمك)
+   openssl genrsa -out server-key.pem 4096
+   openssl req -subj "/CN=<SERVER_FQDN_OR_IP>" -new -key server-key.pem -out server.csr
+   cat > extfile.cnf <<EOF
+   subjectAltName = IP:<SERVER_IP>,IP:127.0.0.1,DNS:<SERVER_FQDN>
+   extendedKeyUsage = serverAuth
+   EOF
+   openssl x509 -req -days 3650 -sha256 -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -extfile extfile.cnf
+
+   # مفاتيح وشهادة العميل (يُستخدم على Windows)
+   openssl genrsa -out key.pem 4096
+   openssl req -subj "/CN=<WINDOWS_USERNAME>" -new -key key.pem -out client.csr
+   echo extendedKeyUsage=clientAuth > extclient.cnf
+   openssl x509 -req -days 3650 -sha256 -in client.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out cert.pem -extfile extclient.cnf
+
+   # ضبط الأذونات
+   chmod 0400 ca-key.pem key.pem server-key.pem
+   chmod 0444 ca.pem server-cert.pem cert.pem
+
+3) إعداد Docker daemon للإنصات على 2376 مع TLS:
+   sudo tee /etc/docker/daemon.json >/dev/null <<'JSON'
+   {
+     "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2376"],
+     "tlscacert": "/etc/docker/certs/ca.pem",
+     "tlscert": "/etc/docker/certs/server-cert.pem",
+     "tlskey": "/etc/docker/certs/server-key.pem",
+     "tlsverify": true
+   }
+   JSON
+
+   sudo systemctl daemon-reload
+   sudo systemctl restart docker
+
+   # تحقّق أن المنفذ يعمل
+   sudo ss -tlpn | grep 2376
+
+4) تقييد الجدار الناري ليُسمح فقط لعنوان IP الخاص بك:
+   # مثال UFW (عدّل IP):
+   sudo ufw allow from <YOUR_WINDOWS_IP> to any port 2376 proto tcp
+
+القسم 3) نسخ شهادات العميل إلى Windows
+---------------------------------------
+انسخ الملفات التالية من الخادم إلى جهازك Windows:
+- ca.pem
+- cert.pem (شهادة العميل)
+- key.pem (مفتاح العميل)
+
+ضعها في المسار:
+  %USERPROFILE%\.docker\certs\my-remote
+أو باستخدام PowerShell:
+  $certDir = "$HOME\.docker\certs\my-remote"
+  New-Item -ItemType Directory -Path $certDir -Force | Out-Null
+
+انسخ الملفات إلى $certDir.
+
+ملاحظة: إذا كان key.pem محميًا بكلمة مرور وتريد عدم إدخالها كل مرة، يمكنك إزالة الحماية على الخادم:
+  openssl rsa -in key.pem -out key.pem
+ثم انسخ الملف الناتج إلى Windows.
+
+القسم 4) تهيئة الاتصال من Windows
+---------------------------------
+الخيار A) متغيرات بيئية للجلسة الحالية فقط:
+  $env:DOCKER_HOST = "tcp://<REMOTE_HOST_OR_IP>:2376"
+  $env:DOCKER_TLS_VERIFY = "1"
+  $env:DOCKER_CERT_PATH = "$HOME\.docker\certs\my-remote"
+
+الخيار B) جعل الإعداد دائمًا (على مستوى المستخدم):
+  [Environment]::SetEnvironmentVariable("DOCKER_HOST", "tcp://<REMOTE_HOST_OR_IP>:2376", "User")
+  [Environment]::SetEnvironmentVariable("DOCKER_TLS_VERIFY", "1", "User")
+  [Environment]::SetEnvironmentVariable("DOCKER_CERT_PATH", "$HOME\.docker\certs\my-remote", "User")
+  # أغلق وأعد فتح PowerShell بعد ذلك
+
+الخيار C) استخدام docker context (موصى به لإدارة عدة وجهات):
+  docker context create my-remote --description "Remote Engine" --docker "host=tcp://<REMOTE_HOST_OR_IP>:2376,ca=$HOME\.docker\certs\my-remote\ca.pem,cert=$HOME\.docker\certs\my-remote\cert.pem,key=$HOME\.docker\certs\my-remote\key.pem"
+  docker context use my-remote
+
+القسم 5) الاختبار والاستخدام
+-----------------------------
+- تحقّق من النسخة:
+  docker --version
+
+- تحقّق من المعلومات (باستخدام context):
+  docker --context my-remote info
+
+- عرض الحاويات:
+  docker --context my-remote ps
+
+- تنفيذ بناء صورة من مجلّد مشروعك المحلي (سيُرسل سياق البناء إلى المحرك البعيد):
+  docker --context my-remote build -t radmeter:latest .
+
+نصيحة: استخدم ملف .dockerignore لتقليل حجم سياق البناء المُرسَل عبر الشبكة (مثل تجاهل node_modules/ وملفات build الضخمة).
+
+القسم 6) استكشاف الأخطاء وإصلاحها
+---------------------------------
+- x509: certificate signed by unknown authority
+  تأكّد أن ca.pem على Windows هو نفسه المُستخدم لتوقيع شهادة الخادم، وأن CN/SAN في server-cert يطابق <REMOTE_HOST_OR_IP> الذي تتصل به.
+
+- error during connect: this error may indicate that the docker daemon is not running
+  تأكّد أن خدمة docker تعمل على الخادم: sudo systemctl status docker
+
+- HTTP response to HTTPS client أو العكس
+  يشير إلى عدم تطابق بين إعدادات TLS والاتصال؛ استخدم 2376 مع TLS (أو 2375 بدون TLS للتجارب فقط).
+
+- client is newer/older than server (توافق API)
+  عادةً تتم المفاوضة تلقائيًا. عند الحاجة: عيّن مستوى API:
+    $env:DOCKER_API_VERSION = "1.41"   # مثال؛ عدّل حسب نسخة الخادم
+
+- Connection refused / timeouts
+  راجع الجدار الناري، عنوان IP، المنفذ 2376، والـ Security Groups في السحابة.
+
+القسم 7) (اختياري) اتصال غير آمن للتجربة فقط — غير مُوصى به
+------------------------------------------------------------
+على الخادم (daemon.json):
+  {
+    "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]
+  }
+ثم أعد تشغيل docker. وعلى Windows:
+  $env:DOCKER_HOST = "tcp://<REMOTE_HOST_OR_IP>:2375"
+بدون ضبط TLS. هذا خطر جدًا؛ استخدمه مؤقتًا في بيئة معزولة فقط.
+
+القسم 8) إزالة الإعداد
+----------------------
+- لإلغاء المتغيرات الدائمة (User):
+  [Environment]::SetEnvironmentVariable("DOCKER_HOST", $null, "User")
+  [Environment]::SetEnvironmentVariable("DOCKER_TLS_VERIFY", $null, "User")
+  [Environment]::SetEnvironmentVariable("DOCKER_CERT_PATH", $null, "User")
+
+- لحذف context:
+  docker context use default
+  docker context rm my-remote
+
+انتهى. باتباع ما سبق ستحصل على Docker CLI على Windows متصل بمحرك Docker بعيد عبر TLS، ويمكنك تنفيذ أوامر مثل:
+  docker --context my-remote build -t radmeter:latest .

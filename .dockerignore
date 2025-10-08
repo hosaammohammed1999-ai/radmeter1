@@ -1,0 +1,28 @@
+# VCS
+.git
+.gitignore
+
+# Python cache & envs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Logs & DBs
+*.log
+app.log
+*.sqlite
+*.sqlite3
+*.db
+attendance.db
+
+# Local-only artifacts (buckets for uploads)
+static/attendance/
+static/employees/
+
+# Optionally exclude dataset if you don't need face dataset in the image
+# dataset/
+
+# Misc
+.wheels/
+.wheelhouse/

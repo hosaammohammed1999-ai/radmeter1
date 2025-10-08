@@ -1,0 +1,138 @@
+RadMeter Deployment Guide (Docker + Render)
+Last updated: 2025-10-08
+
+Goal
+- الحصول على رابط عام ثابت (HTTPS) لواجهة RadMeter يمكن فتحه من المتصفح.
+- تمكين ESP32 من إرسال قراءات POST إلى نفس الرابط (endpoint: /data).
+
+Why Docker + Render?
+- لديك dlib-bin wheel محلي مبني لويندوز؛ أغلب منصات الاستضافة تعتمد Linux ولن تعمل عليه نفس العجلة.
+- Docker يسمح لنا ببناء dlib على لينكس مرة واحدة داخل الصورة وتجنب تعقيد البناء في منصة الاستضافة مباشرة.
+- Render يقدم HTTPS مجاني ورابط ثابت وحجم تخزين دائم (Persistent Disk) بسهولة.
+
+What we will add (after your approval)
+- إضافة ملف واحد فقط: Dockerfile. لا تعديل على كود بايثون.
+- لن نغيّر requirements.txt؛ سنقوم بتجاهل dlib-bin داخل خطوة البناء فقط (grep -v) ونبني dlib من المصدر.
+
+Dockerfile (for review)
+--------------------------------
+# ---- Build stage: يبني dlib وباقي العجلات ----
+FROM python:3.9-bullseye AS build
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake libopenblas-dev liblapack-dev && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY . /app
+RUN python -m pip install --upgrade pip
+# Build dlib wheel (may take a few minutes)
+RUN pip wheel --wheel-dir /wheels dlib==19.24.6
+# Build remaining deps, ignoring the local Windows-only dlib-bin line
+RUN grep -v '^dlib-bin' requirements.txt > /tmp/requirements.filtered.txt && \
+    pip wheel --wheel-dir /wheels -r /tmp/requirements.filtered.txt
+
+# ---- Runtime stage ----
+FROM python:3.9-slim-bullseye
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libopenblas0 liblapack3 libgomp1 && \
+    rm -rf /var/lib/apt/lists/*
+ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY . /app
+COPY --from=build /wheels /wheels
+# Install dlib then the rest from the prebuilt wheels
+RUN pip install --no-index --find-links=/wheels dlib==19.24.6 && \
+    grep -v '^dlib-bin' requirements.txt > /tmp/requirements.filtered.txt && \
+    pip install --no-index --find-links=/wheels -r /tmp/requirements.filtered.txt
+# Ensure writable folders exist
+RUN mkdir -p /app/static/attendance /app/static/employees
+ENV PORT=8080
+EXPOSE 8080
+CMD ["gunicorn", "--workers", "1", "--timeout", "120", "-b", "0.0.0.0:8080", "app:app"]
+--------------------------------
+
+Render deployment steps
+1) ارفع مشروعك إلى GitHub (سيُضاف Dockerfile بعد موافقتك).
+2) على render.com: New → Web Service → اربط مستودع GitHub واختر نوع "Docker".
+3) Environment variables:
+   - PORT=8080
+   - PYTHONUNBUFFERED=1
+4) Add Disk (persistent storage):
+   - Name: radmeter-data
+   - Size: 1GB (أو أكثر حسب الحاجة)
+   - Mount Path: /data
+5) Start Command (يربط التخزين الدائم قبل تشغيل الخادم):
+   bash -lc "mkdir -p /data/static/attendance /data/static/employees && ln -sf /data/attendance.db /app/attendance.db && rm -rf /app/static && ln -s /data/static /app/static && exec gunicorn --workers 1 --timeout 120 -b 0.0.0.0:$PORT app:app"
+6) أنشئ الخدمة وانتظر البناء. ستحصل على رابط مثل:
+   https://your-service.onrender.com
+
+Public endpoints (once deployed)
+- Web UI: GET /
+- Latest radiation from DB: GET /api/radiation/latest
+- System status (cache + DB): GET /api/system_status
+- ESP32 ingestion: POST /data
+  Payload JSON example:
+  {
+    "cpm": 23,
+    "source_power": 0.015,
+    "absorbed_dose": 0.012,
+    "total_dose": 157.30
+  }
+  Response:
+  { "success": true, "message": "Data received and cached successfully", ... }
+
+ESP32 (Arduino) sample code (HTTPS)
+--------------------------------
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char* WIFI_SSID = "YOUR_WIFI";
+const char* WIFI_PASS = "YOUR_PASS";
+const char* API_URL  = "https://your-service.onrender.com/data"; // استبدل بالرابط النهائي
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.println("\nWiFi connected");
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    WiFiClientSecure client;
+    client.setInsecure(); // للتجربة، للإنتاج يفضل تحميل الشهادة الجذرية
+    http.begin(client, API_URL);
+    http.addHeader("Content-Type", "application/json");
+
+    float cpm = 23;
+    float source_power = 0.015;     // μSv/h
+    float absorbed_dose = 0.012;    // μSv/h
+    float total_dose = 157.30;      // μSv
+
+    String payload = String("{\"cpm\":") + cpm +
+                     ",\"source_power\":" + source_power +
+                     ",\"absorbed_dose\":" + absorbed_dose +
+                     ",\"total_dose\":" + total_dose + "}";
+
+    int code = http.POST(payload);
+    Serial.printf("POST code: %d\n", code);
+    Serial.println(http.getString());
+    http.end();
+  }
+  delay(5000);
+}
+--------------------------------
+
+Notes & recommendations
+- TLS/HTTPS على ESP32: أثناء التطوير استخدم client.setInsecure(). في الإنتاج، حمّل الشهادة الجذرية للمضيف (Render) لتفادي تحذيرات الأمان.
+- Persistent storage: ملف attendance.db وملفات static/* ستبقى على القرص المرتبط /data.
+- Workers: شغّل عامل واحد (--workers 1) لأن التطبيق يحوي مجدول وخيوط؛ تعدد العمال قد يكرر المُجدول.
+- Build time: أول نشر قد يستغرق عدة دقائق لبناء dlib.
+
+Alternatives
+- Windows VM (Azure/AWS/GCP): يمكنك تثبيت wheel الويندوز مباشرة وتشغيل التطبيق عبر waitress أو IIS. أسهل مع dlib لكن أعلى كلفة عادةً.
+- Fly.io: شبيه بـ Render، يحتاج إعداد Volume وملف fly.toml، ويمنحك رابط HTTPS ثابت.
+- Cloud Run/App Runner: إدارة تلقائية، لكن تحتاج Volume أو قاعدة مُدارة بدل SQLite.
+
+Next steps
+- عند موافقتك: يمكنني إضافة Dockerfile إلى المشروع وتجهيز إعدادات Render خطوة بخطوة حتى تحصل على الرابط النهائي لاستخدامه في ESP32.

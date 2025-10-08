@@ -1,0 +1,12 @@
+# Render Blueprint for radmeter1
+# Deploy without local Docker. Render will build from your Dockerfile.
+
+services:
+  - type: web
+    name: radmeter1
+    env: docker
+    plan: free
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/system_status

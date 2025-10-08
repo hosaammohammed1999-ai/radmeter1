@@ -1,0 +1,44 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+*.whl
+
+# Environments
+.env
+.env.*
+.venv/
+venv/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs & databases
+*.log
+app.log
+*.sqlite
+*.sqlite3
+*.db
+attendance.db
+
+# Build & cache
+build/
+dist/
+.wheels/
+.wheelhouse/
+.coverage
+.pytest_cache/
+
+# Large or private data
+dataset/
+static/attendance/
+static/employees/
+
+# Node (just in case)
+node_modules/

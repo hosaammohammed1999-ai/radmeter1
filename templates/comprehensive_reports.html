@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>التقارير الإجمالية - نظام مراقبة الإشعاع</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            direction: rtl;
+        }
+
+        .navbar-brand {
+            font-weight: bold;
+            color: #2c3e50 !important;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .metric-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .safety-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .safety-safe { background-color: #d4edda; color: #155724; }
+        .safety-warning { background-color: #fff3cd; color: #856404; }
+        .safety-danger { background-color: #f8d7da; color: #721c24; }
+        .safety-info { background-color: #d1ecf1; color: #0c5460; }
+
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .progress-custom {
+            height: 20px;
+            border-radius: 10px;
+            background-color: #e9ecef;
+        }
+
+        .progress-bar-custom {
+            border-radius: 10px;
+            transition: width 0.6s ease;
+        }
+
+        .table-modern {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .table-modern th {
+            background-color: #f8f9fa;
+            border: none;
+            padding: 15px;
+            font-weight: 600;
+        }
+
+        .table-modern td {
+            border: none;
+            padding: 12px 15px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .refresh-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .refresh-btn:hover {
+            background: linear-gradient(45deg, #764ba2, #667eea);
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .metric-icon {
+            font-size: 2.5rem;
+            opacity: 0.7;
+            margin-bottom: 10px;
+        }
+
+        .section-title {
+            color: #2c3e50;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .alert-custom {
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- شريط التنقل -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-radiation"></i>
+                نظام مراقبة الإشعاع
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">الرئيسية</a>
+                <a class="nav-link" href="/employees">الموظفون</a>
+                <a class="nav-link active" href="/comprehensive_reports">التقارير الإجمالية</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- العنوان الرئيسي -->
+        <div class="summary-card text-center">
+            <h1 class="mb-0">
+                <i class="fas fa-chart-line me-2"></i>
+                التقارير الإجمالية للنظام
+            </h1>
+            <p class="mt-2 mb-0">تقرير شامل عن جميع البيانات الإشعاعية والإحصائيات</p>
+            <div class="timestamp">
+                آخر تحديث: <span id="lastUpdate">جاري التحميل...</span>
+            </div>
+        </div>
+
+        <!-- أزرار التحكم -->
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <button class="btn refresh-btn me-2" onclick="refreshAllData()">
+                    <i class="fas fa-sync-alt me-1"></i>
+                    تحديث البيانات
+                </button>
+                <button class="btn btn-outline-primary" onclick="exportReport()">
+                    <i class="fas fa-download me-1"></i>
+                    تصدير التقرير
+                </button>
+                <button class="btn btn-outline-success" onclick="printReport()">
+                    <i class="fas fa-print me-1"></i>
+                    طباعة
+                </button>
+            </div>
+        </div>
+
+        <!-- إحصائيات النظام العامة -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">
+                    <i class="fas fa-tachometer-alt me-2"></i>
+                    إحصائيات النظام العامة
+                </h2>
+            </div>
+        </div>
+
+        <div class="row" id="systemMetrics">
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-users metric-icon text-primary"></i>
+                    <div class="metric-value text-primary" id="totalEmployees">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">إجمالي الموظفين</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-play-circle metric-icon text-success"></i>
+                    <div class="metric-value text-success" id="activeSessions">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">الجلسات النشطة</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-check-circle metric-icon text-info"></i>
+                    <div class="metric-value text-info" id="completedSessions">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">الجلسات المكتملة</div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-radiation metric-icon text-warning"></i>
+                    <div class="metric-value text-warning" id="totalRadiationReadings">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">إجمالي القراءات</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الجرعات الإجمالية -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    الجرعات الإجمالية للنظام
+                </h2>
+            </div>
+        </div>
+
+        <div class="row" id="totalDoses">
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-sun metric-icon text-info"></i>
+                    <div class="metric-value text-info" id="totalDailyExposure">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">الجرعة اليومية الإجمالية (μSv)</div>
+                    <div class="progress progress-custom mt-2">
+                        <div class="progress-bar progress-bar-custom bg-info" id="dailyProgress"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-calendar-week metric-icon text-primary"></i>
+                    <div class="metric-value text-primary" id="totalWeeklyExposure">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">الجرعة الأسبوعية الإجمالية (μSv)</div>
+                    <div class="progress progress-custom mt-2">
+                        <div class="progress-bar progress-bar-custom bg-primary" id="weeklyProgress"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-calendar-alt metric-icon text-success"></i>
+                    <div class="metric-value text-success" id="totalMonthlyExposure">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">الجرعة الشهرية الإجمالية (μSv)</div>
+                    <div class="progress progress-custom mt-2">
+                        <div class="progress-bar progress-bar-custom bg-success" id="monthlyProgress"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="metric-card text-center">
+                    <i class="fas fa-calendar metric-icon text-warning"></i>
+                    <div class="metric-value text-warning" id="totalAnnualExposure">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">الجرعة السنوية الإجمالية (μSv)</div>
+                    <div class="progress progress-custom mt-2">
+                        <div class="progress-bar progress-bar-custom bg-warning" id="annualProgress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- تحليل الأمان -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">
+                    <i class="fas fa-shield-alt me-2"></i>
+                    تحليل الأمان
+                </h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h4 class="text-center mb-3">توزيع الموظفين حسب مستوى الأمان</h4>
+                    <canvas id="safetyDistributionChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h4 class="text-center mb-3">الجرعات الشهرية للنظام</h4>
+                    <canvas id="monthlyDosesChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- جدول الموظفين المفصل -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">
+                    <i class="fas fa-table me-2"></i>
+                    تفاصيل الموظفين
+                </h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="table-modern">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="employeesTable">
+                            <thead>
+                                <tr>
+                                    <th>معرف الموظف</th>
+                                    <th>الجلسات</th>
+                                    <th>المدة الإجمالية</th>
+                                    <th>التعرض الكلي</th>
+                                    <th>التعرض السنوي</th>
+                                    <th>النسبة المئوية</th>
+                                    <th>حالة الأمان</th>
+                                    <th>آخر نشاط</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeesTableBody">
+                                <tr>
+                                    <td colspan="8" class="text-center">
+                                        <div class="loading-spinner me-2"></div>
+                                        جاري تحميل البيانات...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- الرسوم البيانية التفصيلية -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-area me-2"></i>
+                    الرسوم البيانية التفصيلية
+                </h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h4 class="text-center mb-3">متوسط الجرعة اليومية</h4>
+                    <canvas id="dailyAverageChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h4 class="text-center mb-3">مقارنة الحدود المسموحة</h4>
+                    <canvas id="limitsComparisonChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- إحصائيات إضافية -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="section-title">
+                    <i class="fas fa-info-circle me-2"></i>
+                    إحصائيات إضافية
+                </h2>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5><i class="fas fa-clock text-info me-2"></i>متوسط مدة الجلسة</h5>
+                    <div class="metric-value text-info" id="avgSessionDuration">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">دقيقة</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5><i class="fas fa-atom text-success me-2"></i>متوسط معدل الجرعة</h5>
+                    <div class="metric-value text-success" id="avgDoseRate">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">μSv/ساعة</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="metric-card">
+                    <h5><i class="fas fa-chart-line text-warning me-2"></i>أعلى تعرض مسجل</h5>
+                    <div class="metric-value text-warning" id="maxExposure">
+                        <span class="loading-spinner"></span>
+                    </div>
+                    <div class="metric-label">μSv</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- تحديث المُجدول -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-custom alert-info">
+                    <h5><i class="fas fa-robot me-2"></i>حالة مُجدول البيانات التراكمية</h5>
+                    <div id="schedulerStatus">
+                        <span class="loading-spinner me-2"></span>
+                        جاري فحص حالة المُجدول...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white text-center py-3 mt-5">
+        <div class="container">
+            <p class="mb-0">&copy; 2025 نظام مراقبة الإشعاع المتطور - جميع الحقوق محفوظة</p>
+        </div>
+    </footer>
+
+    <!-- المكتبات -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    
+    <script>
+        // المتغيرات العامة
+        let charts = {};
+        let allEmployeesData = [];
+        
+        // تحديد حدود الأمان
+        const SAFETY_LIMITS = {
+            daily: 54.8,
+            weekly: 383.6,
+            monthly: 1643.8,
+            annual: 20000.0
+        };
+
+        // تحميل البيانات عند بدء الصفحة
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 بدء تحميل التقارير الإجمالية');
+            refreshAllData();
+            
+            // تحديث تلقائي كل 30 ثانية
+            setInterval(updateBasicMetrics, 30000);
+        });
+
+        // تحديث جميع البيانات
+        async function refreshAllData() {
+            console.log('🔄 تحديث جميع البيانات...');
+            
+            try {
+                await Promise.all([
+                    loadSystemMetrics(),
+                    loadEmployeesData(), 
+                    loadSchedulerStatus()
+                ]);
+                
+                updateLastRefreshTime();
+                console.log('✅ تم تحديث جميع البيانات بنجاح');
+                
+            } catch (error) {
+                console.error('❌ خطأ في تحديث البيانات:', error);
+                showAlert('حدث خطأ في تحديث البيانات', 'danger');
+            }
+        }
+
+        // تحميل إحصائيات النظام
+        async function loadSystemMetrics() {
+            try {
+                // جلب البيانات التراكمية السريعة
+                const response = await fetch('/api/cumulative_doses_fast');
+                const data = await response.json();
+                
+                if (data.success && data.employees) {
+                    updateSystemMetrics(data);
+                } else {
+                    throw new Error('فشل في جلب البيانات التراكمية');
+                }
+                
+            } catch (error) {
+                console.error('خطأ في تحميل إحصائيات النظام:', error);
+                showAlert('فشل في تحميل إحصائيات النظام', 'warning');
+            }
+        }
+
+        // تحديث إحصائيات النظام
+        function updateSystemMetrics(data) {
+            const employees = data.employees || [];
+            
+            // الإحصائيات الأساسية
+            document.getElementById('totalEmployees').textContent = employees.length;
+            
+            let activeSessions = 0;
+            let completedSessions = 0;
+            let totalReadings = 0;
+            let totalDailyExposure = 0;
+            let totalWeeklyExposure = 0;
+            let totalMonthlyExposure = 0;
+            let totalAnnualExposure = 0;
+            let totalDuration = 0;
+            let totalExposure = 0;
+            let maxExposure = 0;
+            
+            employees.forEach(emp => {
+                activeSessions += emp.active_sessions || 0;
+                completedSessions += emp.completed_sessions || 0;
+                totalReadings += emp.total_readings || 0;
+                totalDailyExposure += emp.daily_exposure || 0;
+                totalWeeklyExposure += emp.weekly_exposure || 0;
+                totalMonthlyExposure += emp.monthly_exposure || 0;
+                totalAnnualExposure += emp.annual_exposure || 0;
+                totalDuration += emp.total_duration_hours || 0;
+                totalExposure += emp.total_cumulative_exposure || 0;
+                maxExposure = Math.max(maxExposure, emp.max_single_session_exposure || 0);
+            });
+            
+            // تحديث العناصر
+            document.getElementById('activeSessions').textContent = activeSessions;
+            document.getElementById('completedSessions').textContent = completedSessions;
+            document.getElementById('totalRadiationReadings').textContent = totalReadings.toLocaleString();
+            
+            // الجرعات الإجمالية
+            document.getElementById('totalDailyExposure').textContent = totalDailyExposure.toFixed(3);
+            document.getElementById('totalWeeklyExposure').textContent = totalWeeklyExposure.toFixed(3);
+            document.getElementById('totalMonthlyExposure').textContent = totalMonthlyExposure.toFixed(3);
+            document.getElementById('totalAnnualExposure').textContent = totalAnnualExposure.toFixed(3);
+            
+            // التقدم
+            updateProgressBars(totalDailyExposure, totalWeeklyExposure, totalMonthlyExposure, totalAnnualExposure, employees.length);
+            
+            // الإحصائيات الإضافية
+            const avgDuration = employees.length > 0 ? (totalDuration / employees.length) * 60 : 0; // بالدقائق
+            const avgDoseRate = totalDuration > 0 ? totalExposure / totalDuration : 0;
+            
+            document.getElementById('avgSessionDuration').textContent = avgDuration.toFixed(1);
+            document.getElementById('avgDoseRate').textContent = avgDoseRate.toFixed(6);
+            document.getElementById('maxExposure').textContent = maxExposure.toFixed(6);
+            
+            // تحديث الرسوم البيانية
+            updateCharts(employees);
+        }
+
+        // تحديث أشرطة التقدم
+        function updateProgressBars(daily, weekly, monthly, annual, employeeCount) {
+            // حساب النسب المئوية بناءً على عدد الموظفين
+            const dailyLimit = SAFETY_LIMITS.daily * employeeCount;
+            const weeklyLimit = SAFETY_LIMITS.weekly * employeeCount;
+            const monthlyLimit = SAFETY_LIMITS.monthly * employeeCount;
+            const annualLimit = SAFETY_LIMITS.annual * employeeCount;
+            
+            const dailyPercent = Math.min((daily / dailyLimit) * 100, 100);
+            const weeklyPercent = Math.min((weekly / weeklyLimit) * 100, 100);
+            const monthlyPercent = Math.min((monthly / monthlyLimit) * 100, 100);
+            const annualPercent = Math.min((annual / annualLimit) * 100, 100);
+            
+            document.getElementById('dailyProgress').style.width = dailyPercent + '%';
+            document.getElementById('weeklyProgress').style.width = weeklyPercent + '%';
+            document.getElementById('monthlyProgress').style.width = monthlyPercent + '%';
+            document.getElementById('annualProgress').style.width = annualPercent + '%';
+            
+            // تغيير الألوان حسب النسبة
+            updateProgressBarColor('dailyProgress', dailyPercent);
+            updateProgressBarColor('weeklyProgress', weeklyPercent);
+            updateProgressBarColor('monthlyProgress', monthlyPercent);
+            updateProgressBarColor('annualProgress', annualPercent);
+        }
+
+        // تحديث لون شريط التقدم
+        function updateProgressBarColor(elementId, percent) {
+            const element = document.getElementById(elementId);
+            element.className = 'progress-bar progress-bar-custom';
+            
+            if (percent >= 100) {
+                element.classList.add('bg-danger');
+            } else if (percent >= 80) {
+                element.classList.add('bg-warning');
+            } else if (percent >= 50) {
+                element.classList.add('bg-info');
+            } else {
+                element.classList.add('bg-success');
+            }
+        }
+
+        // تحميل بيانات الموظفين
+        async function loadEmployeesData() {
+            try {
+                const response = await fetch('/api/cumulative_doses_fast');
+                const data = await response.json();
+                
+                if (data.success && data.employees) {
+                    allEmployeesData = data.employees;
+                    updateEmployeesTable(data.employees);
+                } else {
+                    throw new Error('فشل في جلب بيانات الموظفين');
+                }
+                
+            } catch (error) {
+                console.error('خطأ في تحميل بيانات الموظفين:', error);
+                document.getElementById('employeesTableBody').innerHTML = 
+                    '<tr><td colspan="8" class="text-center text-danger">فشل في تحميل بيانات الموظفين</td></tr>';
+            }
+        }
+
+        // تحديث جدول الموظفين
+        function updateEmployeesTable(employees) {
+            const tbody = document.getElementById('employeesTableBody');
+            
+            if (employees.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center">لا توجد بيانات موظفين</td></tr>';
+                return;
+            }
+            
+            const rows = employees.map(emp => {
+                const safetyClass = getSafetyClass(emp.safety_class);
+                const lastActivity = emp.last_session_date || 'لا يوجد';
+                
+                return `
+                    <tr>
+                        <td><strong>${emp.employee_id}</strong></td>
+                        <td>
+                            <span class="badge bg-primary">${emp.total_sessions || 0}</span>
+                            <small class="text-muted d-block">
+                                مكتملة: ${emp.completed_sessions || 0} | نشطة: ${emp.active_sessions || 0}
+                            </small>
+                        </td>
+                        <td>
+                            ${(emp.total_duration_hours || 0).toFixed(1)} ساعة
+                            <small class="text-muted d-block">
+                                متوسط: ${(emp.average_session_duration_minutes || 0).toFixed(0)} دقيقة
+                            </small>
+                        </td>
+                        <td>
+                            <strong>${(emp.total_cumulative_exposure || 0).toFixed(3)} μSv</strong>
+                            <small class="text-muted d-block">
+                                متوسط/جلسة: ${(emp.average_exposure_per_session || 0).toFixed(3)}
+                            </small>
+                        </td>
+                        <td>
+                            <strong>${(emp.annual_exposure || 0).toFixed(3)} μSv</strong>
+                        </td>
+                        <td>
+                            <div class="progress progress-custom" style="height: 8px;">
+                                <div class="progress-bar ${getProgressBarClass(emp.annual_exposure_percentage || 0)}" 
+                                     style="width: ${Math.min(emp.annual_exposure_percentage || 0, 100)}%"></div>
+                            </div>
+                            <small>${(emp.annual_exposure_percentage || 0).toFixed(1)}%</small>
+                        </td>
+                        <td>
+                            <span class="safety-badge ${safetyClass}">
+                                ${emp.safety_status || 'غير محدد'}
+                            </span>
+                            <small class="text-muted d-block">
+                                ${emp.risk_level || 'غير محدد'}
+                            </small>
+                        </td>
+                        <td>
+                            <small>${lastActivity}</small>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            tbody.innerHTML = rows;
+        }
+
+        // الحصول على كلاس الأمان
+        function getSafetyClass(safetyClass) {
+            switch(safetyClass) {
+                case 'success': return 'safety-safe';
+                case 'info': return 'safety-info';
+                case 'warning': return 'safety-warning';
+                case 'danger': return 'safety-danger';
+                default: return 'safety-info';
+            }
+        }
+
+        // الحصول على كلاس شريط التقدم
+        function getProgressBarClass(percentage) {
+            if (percentage >= 100) return 'bg-danger';
+            if (percentage >= 80) return 'bg-warning';
+            if (percentage >= 50) return 'bg-info';
+            return 'bg-success';
+        }
+
+        // تحديث الرسوم البيانية
+        function updateCharts(employees) {
+            updateSafetyDistributionChart(employees);
+            updateMonthlyDosesChart(employees);
+            updateDailyAverageChart(employees);
+            updateLimitsComparisonChart(employees);
+        }
+
+        // رسم توزيع الأمان
+        function updateSafetyDistributionChart(employees) {
+            const safetyCount = { success: 0, info: 0, warning: 0, danger: 0 };
+            
+            employees.forEach(emp => {
+                const safetyClass = emp.safety_class || 'success';
+                if (safetyCount.hasOwnProperty(safetyClass)) {
+                    safetyCount[safetyClass]++;
+                } else {
+                    safetyCount.success++;
+                }
+            });
+            
+            const ctx = document.getElementById('safetyDistributionChart').getContext('2d');
+            
+            if (charts.safetyDistribution) {
+                charts.safetyDistribution.destroy();
+            }
+            
+            charts.safetyDistribution = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['آمن', 'مراقبة', 'تحذير', 'خطر'],
+                    datasets: [{
+                        data: [safetyCount.success, safetyCount.info, safetyCount.warning, safetyCount.danger],
+                        backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545'],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // رسم الجرعات الشهرية
+        function updateMonthlyDosesChart(employees) {
+            const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 
+                          'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+            
+            // لتبسيط الأمر، سنعرض الجرعة الشهرية الحالية فقط
+            const currentMonth = new Date().getMonth();
+            const monthlyData = new Array(12).fill(0);
+            
+            employees.forEach(emp => {
+                monthlyData[currentMonth] += emp.monthly_exposure || 0;
+            });
+            
+            const ctx = document.getElementById('monthlyDosesChart').getContext('2d');
+            
+            if (charts.monthlyDoses) {
+                charts.monthlyDoses.destroy();
+            }
+            
+            charts.monthlyDoses = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [{
+                        label: 'الجرعة الشهرية (μSv)',
+                        data: monthlyData,
+                        backgroundColor: '#667eea',
+                        borderColor: '#764ba2',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // رسم متوسط الجرعة اليومية
+        function updateDailyAverageChart(employees) {
+            const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+            const dailyData = new Array(7).fill(0);
+            
+            // تبسيط: عرض الجرعة اليومية الحالية فقط
+            const today = new Date().getDay();
+            employees.forEach(emp => {
+                dailyData[today] += emp.daily_exposure || 0;
+            });
+            
+            const ctx = document.getElementById('dailyAverageChart').getContext('2d');
+            
+            if (charts.dailyAverage) {
+                charts.dailyAverage.destroy();
+            }
+            
+            charts.dailyAverage = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: days,
+                    datasets: [{
+                        label: 'متوسط الجرعة اليومية (μSv)',
+                        data: dailyData,
+                        borderColor: '#28a745',
+                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // رسم مقارنة الحدود
+        function updateLimitsComparisonChart(employees) {
+            let totalDaily = 0, totalWeekly = 0, totalMonthly = 0, totalAnnual = 0;
+            
+            employees.forEach(emp => {
+                totalDaily += emp.daily_exposure || 0;
+                totalWeekly += emp.weekly_exposure || 0;
+                totalMonthly += emp.monthly_exposure || 0;
+                totalAnnual += emp.annual_exposure || 0;
+            });
+            
+            const limits = [
+                SAFETY_LIMITS.daily * employees.length,
+                SAFETY_LIMITS.weekly * employees.length, 
+                SAFETY_LIMITS.monthly * employees.length,
+                SAFETY_LIMITS.annual * employees.length
+            ];
+            
+            const actual = [totalDaily, totalWeekly, totalMonthly, totalAnnual];
+            
+            const ctx = document.getElementById('limitsComparisonChart').getContext('2d');
+            
+            if (charts.limitsComparison) {
+                charts.limitsComparison.destroy();
+            }
+            
+            charts.limitsComparison = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['يومي', 'أسبوعي', 'شهري', 'سنوي'],
+                    datasets: [{
+                        label: 'الجرعة الفعلية (μSv)',
+                        data: actual,
+                        backgroundColor: '#ffc107'
+                    }, {
+                        label: 'الحد المسموح (μSv)',
+                        data: limits,
+                        backgroundColor: '#dc3545'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // تحميل حالة المُجدول
+        async function loadSchedulerStatus() {
+            try {
+                const response = await fetch('/api/scheduler/status');
+                const data = await response.json();
+                
+                updateSchedulerStatus(data);
+                
+            } catch (error) {
+                console.error('خطأ في تحميل حالة المُجدول:', error);
+                document.getElementById('schedulerStatus').innerHTML = 
+                    '<span class="text-danger">فشل في جلب حالة المُجدول</span>';
+            }
+        }
+
+        // تحديث حالة المُجدول
+        function updateSchedulerStatus(data) {
+            const statusDiv = document.getElementById('schedulerStatus');
+            
+            if (!data.available) {
+                statusDiv.innerHTML = '<span class="text-warning">المُجدول غير متاح</span>';
+                return;
+            }
+            
+            if (!data.initialized) {
+                statusDiv.innerHTML = '<span class="text-info">المُجدول غير مُعرَّف</span>';
+                return;
+            }
+            
+            const isRunning = data.is_running;
+            const statusText = isRunning ? 'يعمل' : 'متوقف';
+            const statusClass = isRunning ? 'text-success' : 'text-warning';
+            const statusIcon = isRunning ? 'fa-check-circle' : 'fa-pause-circle';
+            
+            let html = `
+                <div class="d-flex align-items-center">
+                    <i class="fas ${statusIcon} ${statusClass} me-2"></i>
+                    <strong class="${statusClass}">الحالة: ${statusText}</strong>
+                </div>
+            `;
+            
+            if (isRunning) {
+                html += `
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            فترة التحديث: كل ${data.update_interval_minutes || 5} دقيقة |
+                            التحديث الشامل: كل ${data.force_update_interval_hours || 1} ساعة
+                        </small>
+                    </div>
+                `;
+            }
+            
+            statusDiv.innerHTML = html;
+        }
+
+        // تحديث وقت التحديث الأخير
+        function updateLastRefreshTime() {
+            const now = new Date();
+            const timeString = now.toLocaleString('ar-SA', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            document.getElementById('lastUpdate').textContent = timeString;
+        }
+
+        // تحديث البيانات الأساسية فقط (للتحديث التلقائي)
+        async function updateBasicMetrics() {
+            try {
+                await loadSystemMetrics();
+            } catch (error) {
+                console.error('خطأ في التحديث التلقائي:', error);
+            }
+        }
+
+        // تصدير التقرير
+        function exportReport() {
+            // إنشاء محتوى CSV
+            let csvContent = "معرف الموظف,إجمالي الجلسات,المدة بالساعات,التعرض الكلي,التعرض السنوي,النسبة المئوية,حالة الأمان\n";
+            
+            allEmployeesData.forEach(emp => {
+                csvContent += `"${emp.employee_id}",${emp.total_sessions || 0},${(emp.total_duration_hours || 0).toFixed(1)},${(emp.total_cumulative_exposure || 0).toFixed(3)},${(emp.annual_exposure || 0).toFixed(3)},${(emp.annual_exposure_percentage || 0).toFixed(1)},${emp.safety_status || ''}\n`;
+            });
+            
+            // تحميل الملف
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `radiation_report_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // طباعة التقرير
+        function printReport() {
+            window.print();
+        }
+
+        // عرض تنبيه
+        function showAlert(message, type = 'info') {
+            // يمكن تحسين هذا باستخدام Toast أو Modal
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+    </script>
+</body>
+</html>
