@@ -10,10 +10,6 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/system_status
-    disk:
-      name: data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: DB_PATH
-        value: /data/attendance.db
+        value: /tmp/attendance.db
